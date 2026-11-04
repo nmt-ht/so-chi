@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sổ Chi</title>
+  <meta name="description" content="Sổ ghi chi tiêu cá nhân, chạy offline, dữ liệu nằm trên điện thoại của bạn.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Sổ Chi">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#0A4F41" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#123A30" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <button id="fab" class="fab" type="button" data-act="add">
+    <span aria-hidden="true">+</span> Ghi khoản chi
+  </button>
+
+  <nav class="tabs" aria-label="Điều hướng chính">
+    <div class="tabs-inner">
+      <button type="button" data-act="tab" data-view="book">Sổ chi</button>
+      <button type="button" data-act="tab" data-view="stats">Thống kê</button>
+      <button type="button" data-act="tab" data-view="settings">Cài đặt</button>
+    </div>
+  </nav>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <dialog id="sheet" class="sheet" aria-labelledby="sheet-title">
+    <form id="sheet-form" method="dialog" novalidate>
+      <div class="sheet-head">
+        <button type="button" class="link" data-act="sheet-cancel">Hủy</button>
+        <h2 id="sheet-title">Khoản chi mới</h2>
+        <button type="button" class="link danger" id="sheet-delete" data-act="sheet-delete" hidden>Xóa</button>
+      </div>
+
+      <output id="sheet-amount" class="sheet-amount" aria-live="polite">0 đ</output>
+
+      <div id="sheet-cats" class="cats" role="group" aria-label="Danh mục"></div>
+
+      <div class="sheet-fields">
+        <label class="field">
+          <span>Ngày</span>
+          <input id="sheet-date" type="date">
+        </label>
+        <label class="field">
+          <span>Ghi chú</span>
+          <input id="sheet-note" type="text" maxlength="120" placeholder="Không bắt buộc" autocomplete="off" enterkeyhint="done">
+        </label>
+      </div>
+
+      <div id="keypad" class="keypad" role="group" aria-label="Bàn phím số">
+        <button type="button" data-key="1">1</button>
+        <button type="button" data-key="2">2</button>
+        <button type="button" data-key="3">3</button>
+        <button type="button" data-key="4">4</button>
+        <button type="button" data-key="5">5</button>
+        <button type="button" data-key="6">6</button>
+        <button type="button" data-key="7">7</button>
+        <button type="button" data-key="8">8</button>
+        <button type="button" data-key="9">9</button>
+        <button type="button" data-key="000">000</button>
+        <button type="button" data-key="0">0</button>
+        <button type="button" data-key="back" aria-label="Xóa một số">&#9003;</button>
+      </div>
+
+      <button id="sheet-save" type="button" class="primary" data-act="sheet-save" disabled>Lưu</button>
+    </form>
+  </dialog>
+
+  <dialog id="confirm" class="confirm" aria-labelledby="confirm-msg">
+    <p id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button type="button" id="confirm-no" class="secondary">Hủy</button>
+      <button type="button" id="confirm-yes" class="primary danger-fill">Đồng ý</button>
+    </div>
+  </dialog>
+
+  <input id="import-file" type="file" hidden>
+  <script src="app.js"></script>
+</body>
+</html>

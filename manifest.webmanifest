@@ -1,0 +1,17 @@
+{
+  "name": "Sổ Chi",
+  "short_name": "Sổ Chi",
+  "description": "Sổ ghi chi tiêu cá nhân, chạy offline.",
+  "lang": "vi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A4F41",
+  "theme_color": "#0A4F41",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
