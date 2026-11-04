@@ -35,7 +35,9 @@
   --text-lg: 1.125rem;
   --text-xl: 1.5rem;
   --text-2xl: 2.5rem;
-  --text-hero: clamp(2.5rem, 12vw, 3.25rem);
+  --text-hero: clamp(2.25rem, 11vw, 2.75rem);
+  --text-figure: 1.75rem;
+  --text-figure-sm: 1.25rem;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;

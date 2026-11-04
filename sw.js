@@ -1,6 +1,7 @@
-// Serves the app from cache so it opens offline, and refreshes the cache in the
-// background so a newly deployed version appears on the next launch.
-const CACHE = 'so-chi-v2';
+// Keeps every file of one release together so a page never mixes old and new code.
+// Change CACHE on each deploy: the browser sees the new worker, downloads the whole
+// set, and only then takes over.
+const CACHE = 'so-chi-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -14,7 +15,12 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    // 'reload' skips the HTTP cache, which could otherwise hand back a previous release.
+    await cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
@@ -31,24 +37,8 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(request, { ignoreSearch: true });
-    const network = fetch(request)
-      .then((response) => {
-        if (response.ok) cache.put(request, response.clone());
-        return response;
-      })
-      .catch(() => null);
-
-    if (cached) {
-      event.waitUntil(network);
-      return cached;
-    }
-    const fresh = await network;
-    if (fresh) return fresh;
-    if (request.mode === 'navigate') {
-      const shell = await cache.match('./index.html');
-      if (shell) return shell;
-    }
-    return Response.error();
+    const key = request.mode === 'navigate' ? './index.html' : request;
+    const cached = await cache.match(key, { ignoreSearch: true });
+    return cached || fetch(request);
   })());
 });

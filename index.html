@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="mini" class="mini" aria-hidden="true" hidden></div>
   <div id="app"></div>
 
   <nav class="dock" aria-label="Điều hướng chính">
@@ -42,13 +43,15 @@
 
   <dialog id="sheet" class="sheet" aria-labelledby="sheet-title">
     <form id="sheet-form" method="dialog" novalidate>
-      <div class="sheet-head">
+      <div id="sheet-grab" class="sheet-grab" aria-hidden="true"><i></i></div>
+      <div id="sheet-head" class="sheet-head">
         <button type="button" class="link" data-act="sheet-cancel">Hủy</button>
-        <h2 id="sheet-title">Khoản chi mới</h2>
+        <div class="sheet-figure">
+          <h2 id="sheet-title" class="sr-only">Khoản chi mới</h2>
+          <output id="sheet-amount" class="sheet-amount" aria-live="polite">0 đ</output>
+        </div>
         <button type="button" class="link danger" id="sheet-delete" data-act="sheet-delete" hidden>Xóa</button>
       </div>
-
-      <output id="sheet-amount" class="sheet-amount" aria-live="polite">0 đ</output>
 
       <div id="sheet-quick" class="quick" role="group" aria-label="Khoản hay ghi" hidden></div>
       <div id="sheet-cats" class="cats" role="group" aria-label="Danh mục"></div>

@@ -10,6 +10,11 @@ const BACKUP_REMIND_ENTRIES = 20;
 const USAGE_WINDOW_DAYS = 90;
 const QUICK_LIMIT = 6;
 const BACK_HOLD_MS = 500;
+const NEAR_LIMIT_PCT = 85;
+const PACE_TOLERANCE = 0.05;
+const SWIPE_CLOSE_PX = 100;
+const SWIPE_FLICK_PX = 24;
+const SWIPE_FLICK_SPEED = 0.6;
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,14 +22,14 @@ const CAT_ICONS = {
   'Ăn uống': 'M7 3v7a2 2 0 0 0 2 2v9M11 3v7a2 2 0 0 1-2 2M9 3v6M17 21V3c-2 1.5-3 4-3 7v3h3',
   'Cà phê': 'M4 9h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3',
   'Đi chợ': 'M3 10h18l-2 10H5zM8 10l3-6M16 10l-3-6M9.5 14v2.5M14.5 14v2.5',
-  'Đi lại': 'M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h14M8 7h4v4H8zM15 13h1.5a1.5 1.5 0 0 1 1.5 1.5V17a1.5 1.5 0 0 0 3 0V9l-3-3',
+  'Đi lại': 'M8 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM21 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM8 17.5h8c0-4 .5-7.5-1-11h-3M15 6.5h3M3.5 13c2-2 5.500-2 7 0l1.500 2',
   'Nhà cửa': 'M3 11l9-8 9 8M5 9.5V21h14V9.5M10 21v-6h4v6',
   'Điện nước': 'M13 3L5 14h6l-1 7 8-11h-6z',
   'Mua sắm': 'M5 8h14l1 13H4zM9 11V6a3 3 0 0 1 6 0v5',
   'Sức khỏe': 'M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11zM9 12h1.5l1-2 1.5 4 1-2H16',
   'Giải trí': 'M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2.5a1.5 1.5 0 0 0 0 3V16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2.5a1.5 1.5 0 0 0 0-3zM14 6v2M14 11v2M14 16v2',
   'Gia đình': 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 20c0-3.5 2.5-6 6-6s6 2.5 6 6M16 4.5a3.5 3.5 0 0 1 0 6.5M17.5 14.3c2.2.6 3.5 2.8 3.5 5.7',
-  'Hiếu hỉ': 'M3 6h18v13H3zM3 7l9 7 9-7',
+  'Hiếu hỉ': 'M4 11h16v10H4zM3 7h18v4H3zM12 7v14M12 7C10 3 6 3 6 5.500S9 7 12 7zM12 7c2-4 6-4 6-1.500S15 7 12 7z',
   [OTHER]: 'M6 12h.01M12 12h.01M18 12h.01',
 };
 
@@ -168,30 +173,58 @@ function bookHero(spent) {
   if (!budget) {
     return {
       over: false,
+      mini: { left: `Đã chi ${money(spent)}` },
       html: `<p class="hero-label">Đã chi</p>
         <p class="hero-amount">${moneyHtml(spent)}</p>
-        <button type="button" class="band-action" data-act="set-budget">Đặt ngân sách tháng</button>`,
+        <button type="button" class="band-ghost" data-act="set-budget">Đặt ngân sách tháng</button>`,
     };
   }
   const remaining = budget - spent;
   const over = remaining < 0;
   const pct = Math.round((spent / budget) * 100);
-  const near = !over && pct >= 85;
   const isNow = ui.ym === currentYm();
+  const pace = isNow && !over ? budgetPace(spent, budget) : null;
+  const paceAhead = pace !== null && pace.ahead > budget * PACE_TOLERANCE;
+  const warn = !over && (pct >= NEAR_LIMIT_PCT || paceAhead);
   const label = over ? 'Đã vượt ngân sách' : isNow ? 'Còn lại' : 'Còn dư';
-  const lines = [`Đã chi <strong>${money(spent)}</strong> trên ${money(budget)} (${pct}%)`];
-  if (isNow && !over) {
-    const daysLeft = daysInMonth(ui.ym) - new Date().getDate() + 1;
-    const perDay = Math.floor(remaining / daysLeft / 1000) * 1000;
-    if (daysLeft === 1) lines.push('Hôm nay là ngày cuối tháng.');
-    else if (perDay > 0) lines.push(`Còn ${daysLeft} ngày, mỗi ngày tiêu được khoảng <strong>${money(perDay)}</strong>.`);
+
+  let paceLine = '';
+  if (pace) {
+    paceLine = paceAhead
+      ? `<p class="pace warn">Vượt dự kiến đến hôm nay ${money(Math.round(pace.ahead / 1000) * 1000)}</p>`
+      : '<p class="pace">Trong mức dự kiến đến hôm nay</p>';
   }
+  const stats = [`<div><dt>Đã chi (${pct}%)</dt><dd>${money(spent)}</dd></div>`];
+  if (pace) stats.unshift(`<div><dt>${pace.daysLeft === 1 ? 'Hôm nay tiêu được' : 'Mỗi ngày tiêu được'}</dt><dd>${money(pace.perDay)}</dd></div>`);
+
   return {
     over,
+    mini: {
+      over,
+      left: `${label} ${money(Math.abs(remaining))}`,
+      right: pace ? `${money(pace.perDay)}/ngày` : '',
+    },
     html: `<p class="hero-label">${label}</p>
       <p class="hero-amount">${moneyHtml(Math.abs(remaining))}</p>
-      <div class="meter ${near ? 'near' : ''}" aria-hidden="true"><i style="width:${Math.min(pct, 100)}%"></i></div>
-      ${lines.map((l) => `<p class="hero-sub">${l}</p>`).join('')}`,
+      <div class="meter ${warn ? 'warn' : ''}" role="img" aria-label="Đã dùng ${pct}% ngân sách">
+        <i style="width:${Math.min(pct, 100)}%"></i>
+        ${pace ? `<b class="tick" style="left:${pace.markPct}%"></b>` : ''}
+      </div>
+      ${paceLine}
+      <dl class="hero-stats">${stats.join('')}</dl>`,
+  };
+}
+
+// Pace treats the budget as spread evenly across the days of the month.
+function budgetPace(spent, budget) {
+  const day = new Date().getDate();
+  const days = daysInMonth(ui.ym);
+  const daysLeft = days - day + 1;
+  return {
+    markPct: (day / days) * 100,
+    ahead: spent - Math.round((budget * day) / days),
+    daysLeft,
+    perDay: Math.floor((budget - spent) / daysLeft / 1000) * 1000,
   };
 }
 
@@ -225,6 +258,17 @@ function installNotice() {
 function readFlag(name) { try { return localStorage.getItem(`${KEY}.${name}`) === '1'; } catch (_) { return false; } }
 function setFlag(name) { try { localStorage.setItem(`${KEY}.${name}`, '1'); } catch (_) { /* storage unavailable */ } }
 
+function welcome() {
+  return `<section class="welcome">
+    <h2>Chào mừng bạn đến với Sổ Chi</h2>
+    <dl>
+      <div><dt>Ghi khoản chi</dt><dd>Bấm nút ở dưới, nhập số tiền, chọn danh mục rồi lưu.</dd></div>
+      <div><dt>Biết còn tiêu được bao nhiêu</dt><dd>Đặt ngân sách tháng, app sẽ tính mỗi ngày còn tiêu được bao nhiêu.</dd></div>
+      <div><dt>Dữ liệu của bạn</dt><dd>Sổ này chỉ nằm trên điện thoại của bạn. Thỉnh thoảng hãy sao lưu trong Cài đặt.</dd></div>
+    </dl>
+  </section>`;
+}
+
 function renderBook() {
   const month = inMonth(ui.ym);
   const hero = bookHero(sum(month));
@@ -250,14 +294,18 @@ function renderBook() {
         ${catTile(e.cat)}
         <span class="row-text"><span class="row-cat">${esc(e.cat)}</span>${e.note ? `<span class="row-note">${esc(e.note)}</span>` : ''}</span>
         <span class="row-amount">${money(e.amount)}</span>
+        <span class="chev-r" aria-hidden="true">&#8250;</span>
       </button>`).join('')}</div>
     </section>`).join('');
   } else if (ui.filter) {
     list = `<div class="empty"><strong>Không có khoản nào thuộc ${esc(ui.filter)}</strong>Tháng ${monthNum(ui.ym)} chưa ghi khoản chi nào cho danh mục này.</div>`;
+  } else if (!db.expenses.length) {
+    list = welcome();
   } else {
     list = `<div class="empty"><strong>Tháng ${monthNum(ui.ym)} chưa có khoản chi nào</strong>Bấm nút Ghi khoản chi ở dưới để thêm khoản đầu tiên.</div>`;
   }
 
+  ui.mini = hero.mini;
   return `<header class="band ${hero.over ? 'over' : ''}"><div class="band-inner">${monthNav()}${hero.html}${backToNow()}</div></header>
     <main class="content">${installNotice()}${backupNotice()}${filterBar}${list}</main>`;
 }
@@ -293,7 +341,7 @@ function renderCategories(month) {
     <div class="group">${sorted.map(([cat, value]) => `<button type="button" class="cat-row" data-act="filter" data-cat="${esc(cat)}" aria-label="${esc(cat)}, ${money(value)}, xem các khoản">
       ${catTile(cat)}
       <span class="cat-name">${esc(cat)}<small>${Math.round((value / total) * 100)}%</small></span>
-      <span class="cat-value">${money(value)}</span>
+      <span class="cat-value">${money(value)} <span class="chev-r" aria-hidden="true">&#8250;</span></span>
       <span class="cat-track"><i style="width:${(value / top) * 100}%"></i></span>
     </button>`).join('')}</div>
     <p class="section-note">Chạm vào một danh mục để xem các khoản trong đó.</p>
@@ -322,13 +370,14 @@ function renderMonths() {
 function renderStats() {
   const month = inMonth(ui.ym);
   const compare = compareText(month);
+  ui.mini = { left: `Đã chi ${money(sum(month))}` };
   return `<header class="band"><div class="band-inner">${monthNav()}
       <p class="hero-label">Đã chi</p>
       <p class="hero-amount">${moneyHtml(sum(month))}</p>
       ${compare ? `<p class="hero-sub">${compare}</p>` : ''}
       ${backToNow()}
     </div></header>
-    <main class="content">${renderCategories(month)}${renderMonths()}</main>`;
+    <main class="content">${renderMonths()}${renderCategories(month)}</main>`;
 }
 
 /* ---------- Settings view ---------- */
@@ -357,17 +406,20 @@ function renderSettings() {
       </section>
 
       <section class="section">
-        <h2>Danh mục</h2>
+        <div class="section-head">
+          <h2>Danh mục</h2>
+          <button type="button" class="link" data-act="edit-cats">${ui.editCats ? 'Xong' : 'Sửa'}</button>
+        </div>
         <div class="card">
-          <div class="chips">${db.cats.map((c) => c === OTHER
-            ? `<span class="chip-del chip-fixed">${esc(c)}</span>`
-            : `<button type="button" class="chip-del" data-act="del-cat" data-cat="${esc(c)}" aria-label="Xóa danh mục ${esc(c)}">${esc(c)}<b aria-hidden="true">&times;</b></button>`).join('')}</div>
-          <form class="inline-form" id="add-cat">
+          <div class="chips">${db.cats.map((c) => `<span class="chip">${esc(c)}${ui.editCats && c !== OTHER
+            ? `<button type="button" class="chip-x" data-act="del-cat" data-cat="${esc(c)}" aria-label="Xóa danh mục ${esc(c)}"><span aria-hidden="true">&times;</span></button>`
+            : ''}</span>`).join('')}</div>
+          ${ui.editCats ? `<form class="inline-form" id="add-cat">
             <input id="new-cat" type="text" maxlength="24" placeholder="Tên danh mục mới" aria-label="Tên danh mục mới" aria-describedby="cat-error" autocomplete="off">
             <button type="submit" class="secondary">Thêm</button>
           </form>
           <p id="cat-error" class="field-error" role="alert" hidden></p>
-          <p>Xóa danh mục không làm mất các khoản đã ghi.</p>
+          <p>Xóa danh mục không làm mất các khoản đã ghi.</p>` : ''}
         </div>
       </section>
 
@@ -402,9 +454,26 @@ function renderSettings() {
 }
 
 /* ---------- Render ---------- */
+let miniObserver = null;
+
+// A slim summary stays pinned once the green band has scrolled out of view.
+function syncMini() {
+  const el = $('mini');
+  if (miniObserver) miniObserver.disconnect();
+  if (!el) return; // A page still on an older index.html has no pinned summary.
+  el.hidden = true;
+  if (!ui.mini || !('IntersectionObserver' in window)) return;
+  el.classList.toggle('over', Boolean(ui.mini.over));
+  el.innerHTML = `<b>${ui.mini.left}</b>${ui.mini.right ? `<span>${ui.mini.right}</span>` : ''}`;
+  miniObserver = new IntersectionObserver(([entry]) => { el.hidden = entry.isIntersecting; });
+  miniObserver.observe(document.querySelector('.band'));
+}
+
 function render() {
+  ui.mini = null;
   const html = ui.view === 'book' ? renderBook() : ui.view === 'stats' ? renderStats() : renderSettings();
   $('app').innerHTML = html;
+  syncMini();
   ui.freshId = null;
   document.querySelectorAll('.dock-tab').forEach((b) => {
     if (b.dataset.view === ui.view) b.setAttribute('aria-current', 'page');
@@ -414,6 +483,7 @@ function render() {
 
 function goTo(view) {
   if (view === 'settings' && ui.view !== 'settings') ui.prev = ui.view;
+  if (view !== 'settings') ui.editCats = false;
   ui.view = view;
   render();
   window.scrollTo(0, 0);
@@ -467,10 +537,11 @@ function drawAmount() {
   const value = Number(sheetState.digits) || 0;
   out.textContent = money(value);
   out.classList.toggle('zero', value === 0);
+  out.classList.toggle('mid', sheetState.digits.length > 6);
   out.classList.toggle('long', sheetState.digits.length > 9);
   const save = $('sheet-save');
   save.disabled = value === 0;
-  save.textContent = value ? `Lưu ${money(value)}` : 'Nhập số tiền';
+  save.textContent = value ? `Lưu ${money(value)} · ${sheetState.cat}` : 'Nhập số tiền';
 }
 
 function drawDate() {
@@ -517,18 +588,20 @@ function drawQuick(isNew) {
   const box = $('sheet-quick');
   box.hidden = picks.length === 0;
   box.innerHTML = picks.map((p) => `<button type="button" data-act="quick" data-cat="${esc(p.cat)}" data-amount="${p.amount}"
-      aria-label="Điền ${esc(p.cat)}, ${money(p.amount)}">${esc(p.cat)} <b>${short(p.amount)}</b></button>`).join('');
+      aria-label="Điền ${esc(p.cat)}, ${money(p.amount)}">${esc(p.cat)} <b>${money(p.amount)}</b></button>`).join('');
 }
 
 function drawCats() {
-  $('sheet-cats').innerHTML = sheetState.order.map((c) => `<button type="button" data-act="pick-cat" data-cat="${esc(c)}" aria-pressed="${c === sheetState.cat}">${catTile(c)}${esc(c)}</button>`).join('');
+  $('sheet-cats').innerHTML = sheetState.order.map((c) => `<button type="button" data-act="pick-cat" data-cat="${esc(c)}" aria-pressed="${c === sheetState.cat}">${catTile(c)}<span>${esc(c)}</span></button>`).join('');
 }
 
-// Scrolls only the category strip; scrollIntoView would also move the sheet.
+// Scrolls only the category box; scrollIntoView would also move the sheet.
 function revealChosenCat() {
   const box = $('sheet-cats');
   const chosen = box.querySelector('[aria-pressed="true"]');
-  if (chosen) box.scrollLeft = Math.max(0, chosen.offsetLeft - box.offsetLeft - 16);
+  if (!chosen) return;
+  box.scrollLeft = Math.max(0, chosen.offsetLeft - box.offsetLeft - 16);
+  box.scrollTop = Math.max(0, chosen.offsetTop - box.offsetTop - 8);
 }
 
 function openSheet(entry) {
@@ -560,6 +633,7 @@ function defaultEntryDate() {
 function closeSheet() {
   $('sheet').close();
   $('sheet').style.bottom = '';
+  $('sheet').style.transform = '';
   document.body.classList.remove('locked');
 }
 
@@ -761,11 +835,12 @@ const actions = {
   filter: (el) => { ui.filter = el.dataset.cat; goTo('book'); },
   'clear-filter': () => { ui.filter = null; render(); },
   'set-budget': () => { goTo('settings'); $('budget').focus(); },
+  'edit-cats': () => { ui.editCats = !ui.editCats; render(); },
   'hide-install': () => { setFlag('hideInstall'); render(); },
   'sheet-cancel': closeSheet,
   'sheet-save': saveSheet,
   'sheet-delete': deleteFromSheet,
-  'pick-cat': (el) => { sheetState.cat = el.dataset.cat; drawCats(); },
+  'pick-cat': (el) => { sheetState.cat = el.dataset.cat; drawCats(); drawAmount(); },
   backup,
   csv: exportCsv,
   restore: () => $('import-file').click(),
@@ -804,6 +879,42 @@ $('keypad').addEventListener('pointerdown', (e) => {
 });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
   $('keypad').addEventListener(type, () => clearTimeout(backHoldTimer));
+});
+
+// Drag the top of the sheet down to dismiss it, as on native iOS sheets.
+let sheetDrag = null;
+function dragStart(e) {
+  if (e.target.closest('button')) return;
+  sheetDrag = { y: e.clientY, t: e.timeStamp, dy: 0 };
+  $('sheet').classList.add('dragging');
+  e.currentTarget.setPointerCapture(e.pointerId);
+}
+function dragMove(e) {
+  if (!sheetDrag) return;
+  sheetDrag.dy = Math.max(0, e.clientY - sheetDrag.y);
+  $('sheet').style.transform = `translateY(${sheetDrag.dy}px)`;
+}
+function dragEnd(e) {
+  if (!sheetDrag) return;
+  const { dy, t } = sheetDrag;
+  const speed = dy / Math.max(1, e.timeStamp - t);
+  sheetDrag = null;
+  $('sheet').classList.remove('dragging');
+  if (dy > SWIPE_CLOSE_PX || (dy > SWIPE_FLICK_PX && speed > SWIPE_FLICK_SPEED)) closeSheet();
+  else $('sheet').style.transform = '';
+}
+['sheet-grab', 'sheet-head'].forEach((id) => {
+  const handle = $(id);
+  if (!handle) return; // Absent on a page still using an older index.html.
+  handle.addEventListener('pointerdown', dragStart);
+  handle.addEventListener('pointermove', dragMove);
+  handle.addEventListener('pointerup', dragEnd);
+  handle.addEventListener('pointercancel', dragEnd);
+});
+
+// Tapping outside closes an untouched sheet; an entered amount is never dropped that way.
+$('sheet').addEventListener('click', (e) => {
+  if (e.target === $('sheet') && !sheetState.digits) closeSheet();
 });
 
 $('sheet-date').addEventListener('input', drawDate);
@@ -904,4 +1015,21 @@ render();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+
+  // Home-screen apps can stay open for days, so look for a new release on each return.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    navigator.serviceWorker.getRegistration()
+      .then((reg) => reg && reg.update())
+      .catch(() => {});
+  });
+
+  // Switch to a new release straight away, unless someone is partway through an entry.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading || $('sheet').open || $('confirm').open) return;
+    reloading = true;
+    location.reload();
+  });
 }
