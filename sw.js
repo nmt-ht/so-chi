@@ -1,9 +1,10 @@
 // Serves the app from cache so it opens offline, and refreshes the cache in the
 // background so a newly deployed version appears on the next launch.
-const CACHE = 'so-chi-v1';
+const CACHE = 'so-chi-v2';
 const ASSETS = [
   './',
   './index.html',
+  './tokens.css',
   './styles.css',
   './app.js',
   './manifest.webmanifest',

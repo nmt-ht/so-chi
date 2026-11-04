@@ -1,0 +1,97 @@
+/* Hallmark · tokens for Sổ Chi · theme: custom (existing brand kept)
+ * vibe: banknote green pocket ledger, plain and quick
+ * axes: light paper / classical-serif numerals on system sans / chromatic-other green
+ */
+:root {
+  --color-paper: oklch(95.9% 0.007 152);
+  --color-surface: oklch(100% 0 0);
+  --color-sunk: oklch(93.3% 0.010 155);
+  --color-ink: oklch(28.4% 0.038 179);
+  --color-muted: oklch(50.2% 0.033 168);
+  --color-line: oklch(89.4% 0.014 156);
+  --color-accent: oklch(47.2% 0.088 173);
+  --color-on-accent: oklch(100% 0 0);
+  --color-accent-soft: oklch(92.7% 0.018 166);
+  --color-bar-muted: oklch(65.6% 0.054 172);
+  --color-danger: oklch(50.1% 0.178 29);
+  --color-on-danger: oklch(100% 0 0);
+  --color-band: oklch(38.4% 0.068 175);
+  --color-band-over: oklch(42.6% 0.151 29);
+  --color-band-ink: oklch(100% 0 0);
+  --color-band-muted: oklch(89.9% 0.024 170);
+  --color-band-track: oklch(100% 0 0 / 0.24);
+  --color-band-near: oklch(84.1% 0.125 81);
+  --color-band-press: oklch(100% 0 0 / 0.14);
+  --color-scrim: oklch(20% 0.02 175 / 0.5);
+  --color-toast: oklch(28.4% 0.038 179);
+  --color-on-toast: oklch(95.9% 0.007 152);
+
+  --font-body: -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-figure: ui-serif, "New York", "Iowan Old Style", Cambria, "Times New Roman", serif;
+
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2.5rem;
+  --text-hero: clamp(2.5rem, 12vw, 3.25rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+
+  --tap: 2.75rem;
+  --dock-h: 4rem;
+
+  --gutter-l: max(1rem, env(safe-area-inset-left, 0px));
+  --gutter-r: max(1rem, env(safe-area-inset-right, 0px));
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 900ms;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: oklch(19.4% 0.015 172);
+    --color-surface: oklch(24.3% 0.018 172);
+    --color-sunk: oklch(29.5% 0.021 171);
+    --color-ink: oklch(94.8% 0.010 165);
+    --color-muted: oklch(73.8% 0.027 168);
+    --color-line: oklch(33.2% 0.024 166);
+    --color-accent: oklch(78.1% 0.118 171);
+    --color-on-accent: oklch(23.9% 0.040 173);
+    --color-accent-soft: oklch(32.3% 0.038 171);
+    --color-bar-muted: oklch(55.2% 0.056 172);
+    --color-danger: oklch(75.9% 0.144 26);
+    --color-on-danger: oklch(24.3% 0.018 172);
+    --color-band: oklch(31.7% 0.048 174);
+    --color-band-over: oklch(36.5% 0.113 28);
+    --color-band-ink: oklch(97.4% 0.007 165);
+    --color-band-muted: oklch(82.9% 0.027 169);
+    --color-band-track: oklch(100% 0 0 / 0.18);
+    --color-band-near: oklch(82.4% 0.123 79);
+    --color-band-press: oklch(100% 0 0 / 0.12);
+    --color-scrim: oklch(0% 0 0 / 0.6);
+    --color-toast: oklch(94.8% 0.010 165);
+    --color-on-toast: oklch(19.4% 0.015 172);
+    color-scheme: dark;
+  }
+}

@@ -7,8 +7,35 @@ const WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ N
 const MAX_AMOUNT = 999999999999;
 const BACKUP_REMIND_DAYS = 30;
 const BACKUP_REMIND_ENTRIES = 20;
+const USAGE_WINDOW_DAYS = 90;
+const QUICK_LIMIT = 6;
+const BACK_HOLD_MS = 500;
 
 const $ = (id) => document.getElementById(id);
+
+const CAT_ICONS = {
+  'Ăn uống': 'M7 3v7a2 2 0 0 0 2 2v9M11 3v7a2 2 0 0 1-2 2M9 3v6M17 21V3c-2 1.5-3 4-3 7v3h3',
+  'Cà phê': 'M4 9h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3',
+  'Đi chợ': 'M3 10h18l-2 10H5zM8 10l3-6M16 10l-3-6M9.5 14v2.5M14.5 14v2.5',
+  'Đi lại': 'M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h14M8 7h4v4H8zM15 13h1.5a1.5 1.5 0 0 1 1.5 1.5V17a1.5 1.5 0 0 0 3 0V9l-3-3',
+  'Nhà cửa': 'M3 11l9-8 9 8M5 9.5V21h14V9.5M10 21v-6h4v6',
+  'Điện nước': 'M13 3L5 14h6l-1 7 8-11h-6z',
+  'Mua sắm': 'M5 8h14l1 13H4zM9 11V6a3 3 0 0 1 6 0v5',
+  'Sức khỏe': 'M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11zM9 12h1.5l1-2 1.5 4 1-2H16',
+  'Giải trí': 'M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2.5a1.5 1.5 0 0 0 0 3V16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2.5a1.5 1.5 0 0 0 0-3zM14 6v2M14 11v2M14 16v2',
+  'Gia đình': 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 20c0-3.5 2.5-6 6-6s6 2.5 6 6M16 4.5a3.5 3.5 0 0 1 0 6.5M17.5 14.3c2.2.6 3.5 2.8 3.5 5.7',
+  'Hiếu hỉ': 'M3 6h18v13H3zM3 7l9 7 9-7',
+  [OTHER]: 'M6 12h.01M12 12h.01M18 12h.01',
+};
+
+// Categories the family adds themselves show their first letter instead of a drawing.
+function catTile(name) {
+  const path = CAT_ICONS[name];
+  const inner = path
+    ? `<svg viewBox="0 0 24 24"><path d="${path}"/></svg>`
+    : esc(Array.from(name)[0].toUpperCase());
+  return `<span class="tile" aria-hidden="true">${inner}</span>`;
+}
 
 /* ---------- Dates: always local time, never toISOString (Vietnam is UTC+7). ---------- */
 const pad = (n) => String(n).padStart(2, '0');
@@ -112,7 +139,7 @@ function save() {
 }
 
 let db = load();
-const ui = { view: 'book', ym: currentYm(), filter: null };
+const ui = { view: 'book', prev: 'book', ym: currentYm(), filter: null, freshId: null };
 
 /* ---------- Queries ---------- */
 const inMonth = (ym) => db.expenses.filter((e) => e.date.startsWith(ym));
@@ -122,11 +149,18 @@ const newestFirst = (a, b) => (b.date.localeCompare(a.date)) || (b.createdAt - a
 /* ---------- Shared header ---------- */
 function monthNav() {
   const atNow = ui.ym >= currentYm();
-  return `<div class="month-nav">
-    <button type="button" data-act="month" data-step="-1" aria-label="Tháng trước">&#8249;</button>
+  return `<div class="top-row">
+    <button type="button" class="chev" data-act="month" data-step="-1" aria-label="Tháng trước">&#8249;</button>
     <h1>${monthTitle(ui.ym)}</h1>
-    <button type="button" data-act="month" data-step="1" aria-label="Tháng sau" ${atNow ? 'disabled' : ''}>&#8250;</button>
+    <button type="button" class="chev" data-act="month" data-step="1" aria-label="Tháng sau" ${atNow ? 'disabled' : ''}>&#8250;</button>
+    <button type="button" class="top-link push" data-act="tab" data-view="settings">Cài đặt</button>
   </div>`;
+}
+
+function backToNow() {
+  return ui.ym < currentYm()
+    ? '<button type="button" class="band-link" data-act="now">Về tháng này</button>'
+    : '';
 }
 
 function bookHero(spent) {
@@ -212,18 +246,19 @@ function renderBook() {
   if (days.length) {
     list = days.map((d) => `<section class="day">
       <div class="day-head"><b>${dayLabel(d.date)}</b><span>${money(sum(d.items))}</span></div>
-      <div class="group">${d.items.map((e) => `<button type="button" class="row" data-act="edit" data-id="${esc(e.id)}">
-        <span><span class="row-cat">${esc(e.cat)}</span>${e.note ? `<span class="row-note">${esc(e.note)}</span>` : ''}</span>
+      <div class="group">${d.items.map((e) => `<button type="button" class="row ${e.id === ui.freshId ? 'fresh' : ''}" data-act="edit" data-id="${esc(e.id)}">
+        ${catTile(e.cat)}
+        <span class="row-text"><span class="row-cat">${esc(e.cat)}</span>${e.note ? `<span class="row-note">${esc(e.note)}</span>` : ''}</span>
         <span class="row-amount">${money(e.amount)}</span>
       </button>`).join('')}</div>
     </section>`).join('');
   } else if (ui.filter) {
     list = `<div class="empty"><strong>Không có khoản nào thuộc ${esc(ui.filter)}</strong>Tháng ${monthNum(ui.ym)} chưa ghi khoản chi nào cho danh mục này.</div>`;
   } else {
-    list = `<div class="empty"><strong>Tháng ${monthNum(ui.ym)} chưa có khoản chi nào</strong>Bấm Ghi khoản chi để thêm khoản đầu tiên.</div>`;
+    list = `<div class="empty"><strong>Tháng ${monthNum(ui.ym)} chưa có khoản chi nào</strong>Bấm nút Ghi khoản chi ở dưới để thêm khoản đầu tiên.</div>`;
   }
 
-  return `<header class="band ${hero.over ? 'over' : ''}"><div class="band-inner">${monthNav()}${hero.html}</div></header>
+  return `<header class="band ${hero.over ? 'over' : ''}"><div class="band-inner">${monthNav()}${hero.html}${backToNow()}</div></header>
     <main class="content">${installNotice()}${backupNotice()}${filterBar}${list}</main>`;
 }
 
@@ -256,6 +291,7 @@ function renderCategories(month) {
   return `<section class="section">
     <h2>Tháng ${m} tiền đi đâu?</h2>
     <div class="group">${sorted.map(([cat, value]) => `<button type="button" class="cat-row" data-act="filter" data-cat="${esc(cat)}" aria-label="${esc(cat)}, ${money(value)}, xem các khoản">
+      ${catTile(cat)}
       <span class="cat-name">${esc(cat)}<small>${Math.round((value / total) * 100)}%</small></span>
       <span class="cat-value">${money(value)}</span>
       <span class="cat-track"><i style="width:${(value / top) * 100}%"></i></span>
@@ -290,6 +326,7 @@ function renderStats() {
       <p class="hero-label">Đã chi</p>
       <p class="hero-amount">${moneyHtml(sum(month))}</p>
       ${compare ? `<p class="hero-sub">${compare}</p>` : ''}
+      ${backToNow()}
     </div></header>
     <main class="content">${renderCategories(month)}${renderMonths()}</main>`;
 }
@@ -302,7 +339,10 @@ function backupStatus() {
 }
 
 function renderSettings() {
-  return `<header class="band"><div class="band-inner"><h1 class="page-title">Cài đặt</h1></div></header>
+  return `<header class="band"><div class="band-inner">
+      <div class="top-row"><button type="button" class="top-link" data-act="back">&#8249; Quay lại</button></div>
+      <h1 class="page-title">Cài đặt</h1>
+    </div></header>
     <main class="content">
       ${isIosBrowserTab() ? `<div class="notice"><p>Bấm nút Chia sẻ của Safari, chọn <b>Thêm vào MH chính</b> để dùng như app và giữ dữ liệu lâu dài.</p></div>` : ''}
       <section class="section">
@@ -323,9 +363,10 @@ function renderSettings() {
             ? `<span class="chip-del chip-fixed">${esc(c)}</span>`
             : `<button type="button" class="chip-del" data-act="del-cat" data-cat="${esc(c)}" aria-label="Xóa danh mục ${esc(c)}">${esc(c)}<b aria-hidden="true">&times;</b></button>`).join('')}</div>
           <form class="inline-form" id="add-cat">
-            <input id="new-cat" type="text" maxlength="24" placeholder="Tên danh mục mới" aria-label="Tên danh mục mới" autocomplete="off">
+            <input id="new-cat" type="text" maxlength="24" placeholder="Tên danh mục mới" aria-label="Tên danh mục mới" aria-describedby="cat-error" autocomplete="off">
             <button type="submit" class="secondary">Thêm</button>
           </form>
+          <p id="cat-error" class="field-error" role="alert" hidden></p>
           <p>Xóa danh mục không làm mất các khoản đã ghi.</p>
         </div>
       </section>
@@ -336,9 +377,17 @@ function renderSettings() {
           <p>Dữ liệu chỉ nằm trên điện thoại này. Nếu xóa app hoặc đổi máy mà chưa sao lưu, dữ liệu sẽ mất. ${backupStatus()}</p>
           <div class="stack">
             <button type="button" class="primary" data-act="backup">Sao lưu vào Tệp hoặc iCloud</button>
-            <button type="button" class="secondary" data-act="restore">Khôi phục từ file sao lưu</button>
-            <button type="button" class="secondary" data-act="csv">Xuất file CSV để mở bằng Excel</button>
+            <button type="button" class="secondary" data-act="restore">Khôi phục từ bản sao lưu</button>
+            <button type="button" class="secondary" data-act="csv">Xuất file Excel (CSV)</button>
           </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Người nhà</h2>
+        <div class="card">
+          <p>Mỗi điện thoại có một sổ riêng. Người nhà cài app từ đường dẫn này và không xem được dữ liệu của bạn.</p>
+          <button type="button" class="secondary" data-act="share-app">Gửi app cho người nhà</button>
         </div>
       </section>
 
@@ -356,14 +405,15 @@ function renderSettings() {
 function render() {
   const html = ui.view === 'book' ? renderBook() : ui.view === 'stats' ? renderStats() : renderSettings();
   $('app').innerHTML = html;
-  $('fab').hidden = ui.view === 'settings';
-  document.querySelectorAll('.tabs button').forEach((b) => {
+  ui.freshId = null;
+  document.querySelectorAll('.dock-tab').forEach((b) => {
     if (b.dataset.view === ui.view) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   });
 }
 
 function goTo(view) {
+  if (view === 'settings' && ui.view !== 'settings') ui.prev = ui.view;
   ui.view = view;
   render();
   window.scrollTo(0, 0);
@@ -410,27 +460,82 @@ function ask(message, yesLabel) {
 }
 
 /* ---------- Entry sheet ---------- */
-const sheetState = { id: null, digits: '', cat: '' };
+const sheetState = { id: null, digits: '', cat: '', order: [] };
 
 function drawAmount() {
   const out = $('sheet-amount');
   const value = Number(sheetState.digits) || 0;
   out.textContent = money(value);
   out.classList.toggle('zero', value === 0);
-  $('sheet-save').disabled = value === 0;
+  out.classList.toggle('long', sheetState.digits.length > 9);
+  const save = $('sheet-save');
+  save.disabled = value === 0;
+  save.textContent = value ? `Lưu ${money(value)}` : 'Nhập số tiền';
+}
+
+function drawDate() {
+  const value = $('sheet-date').value;
+  $('sheet-date-label').textContent = isValidDate(value) ? dayLabel(value) : 'Hôm nay';
+}
+
+function recentEntries() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - USAGE_WINDOW_DAYS);
+  const from = ymd(cutoff);
+  return db.expenses.filter((e) => e.date >= from);
+}
+
+// Most-used categories come first so the usual one needs no scrolling. "Khác" stays last.
+function orderedCats(current) {
+  const uses = new Map();
+  for (const e of recentEntries()) uses.set(e.cat, (uses.get(e.cat) || 0) + 1);
+  const names = db.cats.includes(current) ? db.cats.slice() : [current, ...db.cats];
+  const rank = (c) => (c === OTHER ? -1 : uses.get(c) || 0);
+  return names
+    .map((c, i) => [c, i])
+    .sort((a, b) => rank(b[0]) - rank(a[0]) || a[1] - b[1])
+    .map(([c]) => c);
+}
+
+// Amounts entered at least twice for the same category are offered as one-tap fills.
+function quickPicks() {
+  const seen = new Map();
+  for (const e of recentEntries().sort(newestFirst)) {
+    const key = `${e.cat}|${e.amount}`;
+    const item = seen.get(key) || { cat: e.cat, amount: e.amount, count: 0 };
+    item.count += 1;
+    seen.set(key, item);
+  }
+  return [...seen.values()]
+    .filter((p) => p.count >= 2)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, QUICK_LIMIT);
+}
+
+function drawQuick(isNew) {
+  const picks = isNew ? quickPicks() : [];
+  const box = $('sheet-quick');
+  box.hidden = picks.length === 0;
+  box.innerHTML = picks.map((p) => `<button type="button" data-act="quick" data-cat="${esc(p.cat)}" data-amount="${p.amount}"
+      aria-label="Điền ${esc(p.cat)}, ${money(p.amount)}">${esc(p.cat)} <b>${short(p.amount)}</b></button>`).join('');
 }
 
 function drawCats() {
-  const names = db.cats.includes(sheetState.cat) ? db.cats : [sheetState.cat, ...db.cats];
-  $('sheet-cats').innerHTML = names.map((c) => `<button type="button" data-act="pick-cat" data-cat="${esc(c)}" aria-pressed="${c === sheetState.cat}">${esc(c)}</button>`).join('');
-  const chosen = $('sheet-cats').querySelector('[aria-pressed="true"]');
-  if (chosen && chosen.scrollIntoView) chosen.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  $('sheet-cats').innerHTML = sheetState.order.map((c) => `<button type="button" data-act="pick-cat" data-cat="${esc(c)}" aria-pressed="${c === sheetState.cat}">${catTile(c)}${esc(c)}</button>`).join('');
+}
+
+// Scrolls only the category strip; scrollIntoView would also move the sheet.
+function revealChosenCat() {
+  const box = $('sheet-cats');
+  const chosen = box.querySelector('[aria-pressed="true"]');
+  if (chosen) box.scrollLeft = Math.max(0, chosen.offsetLeft - box.offsetLeft - 16);
 }
 
 function openSheet(entry) {
   sheetState.id = entry ? entry.id : null;
   sheetState.digits = entry ? String(entry.amount) : '';
   sheetState.cat = entry ? entry.cat : (db.cats.includes(db.lastCat) ? db.lastCat : db.cats[0]);
+  sheetState.order = orderedCats(sheetState.cat);
   $('sheet-title').textContent = entry ? 'Sửa khoản chi' : 'Khoản chi mới';
   $('sheet-delete').hidden = !entry;
   $('sheet-date').max = today();
@@ -440,7 +545,10 @@ function openSheet(entry) {
   document.body.classList.add('locked');
   $('sheet').showModal();
   drawAmount();
+  drawDate();
+  drawQuick(!entry);
   drawCats();
+  revealChosenCat();
 }
 
 // A new entry goes on today, or on the last day of the past month being viewed.
@@ -455,7 +563,11 @@ function closeSheet() {
   document.body.classList.remove('locked');
 }
 
+let backHoldTimer = 0;
+let backHeld = false;
+
 function pressKey(key) {
+  if (key === 'back' && backHeld) { backHeld = false; return; }
   let d = sheetState.digits;
   if (key === 'back') d = d.slice(0, -1);
   else if (d === '' && /^0+$/.test(key)) return;
@@ -472,10 +584,12 @@ function saveSheet() {
   if (!isValidDate(date) || date > today()) date = today();
   const note = $('sheet-note').value.trim();
   const existing = sheetState.id && db.expenses.find((e) => e.id === sheetState.id);
+  const before = existing ? { ...existing } : null;
+  const id = existing ? existing.id : newId();
   if (existing) {
     Object.assign(existing, { amount, date, note, cat: sheetState.cat });
   } else {
-    db.expenses.push({ id: newId(), amount, date, note, cat: sheetState.cat, createdAt: Date.now() });
+    db.expenses.push({ id, amount, date, note, cat: sheetState.cat, createdAt: Date.now() });
     db.lastCat = sheetState.cat;
   }
   const saved = save();
@@ -483,8 +597,34 @@ function saveSheet() {
   ui.ym = date.slice(0, 7);
   if (ui.filter && ui.filter !== sheetState.cat) ui.filter = null;
   ui.view = 'book';
+  ui.freshId = id;
   render();
-  if (saved) toast(`${existing ? 'Đã sửa' : 'Đã ghi'} ${money(amount)}, ${sheetState.cat}`);
+  if (!saved) return;
+  toast(`${before ? 'Đã sửa' : 'Đã ghi'} ${money(amount)}, ${sheetState.cat}`, 'Hoàn tác', () => {
+    if (before) Object.assign(db.expenses.find((e) => e.id === id) || {}, before);
+    else db.expenses = db.expenses.filter((e) => e.id !== id);
+    save();
+    if (before) ui.ym = before.date.slice(0, 7);
+    render();
+  });
+}
+
+async function shareApp() {
+  const url = location.href.split('#')[0];
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Sổ Chi', text: 'Sổ ghi chi tiêu trên điện thoại. Mở bằng Safari rồi chọn Thêm vào MH chính.', url });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Đã chép đường dẫn app. Bạn dán vào tin nhắn gửi người nhà.');
+  } catch (err) {
+    toast(`Đường dẫn app: ${url}`);
+  }
 }
 
 function deleteFromSheet() {
@@ -597,6 +737,16 @@ async function wipe() {
 const actions = {
   add: () => openSheet(null),
   tab: (el) => goTo(el.dataset.view),
+  back: () => goTo(ui.prev),
+  now: () => { ui.ym = currentYm(); render(); },
+  quick: (el) => {
+    sheetState.digits = el.dataset.amount;
+    sheetState.cat = el.dataset.cat;
+    drawAmount();
+    drawCats();
+    revealChosenCat();
+  },
+  'share-app': shareApp,
   month: (el) => {
     const next = addMonths(ui.ym, Number(el.dataset.step));
     if (next > currentYm()) return;
@@ -642,7 +792,28 @@ document.addEventListener('click', (e) => {
   if (el && actions[el.dataset.act]) actions[el.dataset.act](el);
 });
 
+// Holding the backspace key clears the whole amount.
+$('keypad').addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('[data-key="back"]')) return;
+  backHeld = false;
+  backHoldTimer = setTimeout(() => {
+    backHeld = true;
+    sheetState.digits = '';
+    drawAmount();
+  }, BACK_HOLD_MS);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
+  $('keypad').addEventListener(type, () => clearTimeout(backHoldTimer));
+});
+
+$('sheet-date').addEventListener('input', drawDate);
+$('sheet-date').addEventListener('change', drawDate);
+
 document.addEventListener('input', (e) => {
+  if (e.target.id === 'new-cat') {
+    $('cat-error').hidden = true;
+    e.target.removeAttribute('aria-invalid');
+  }
   if (e.target.id !== 'budget') return;
   const digits = e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 12);
   e.target.value = digits ? groupDigits(digits) : '';
@@ -667,7 +838,10 @@ document.addEventListener('submit', (e) => {
   const name = input.value.trim().slice(0, 24);
   if (!name) { input.focus(); return; }
   if (db.cats.some((c) => c.toLowerCase() === name.toLowerCase())) {
-    toast(`Danh mục ${name} đã có sẵn.`);
+    $('cat-error').textContent = `Danh mục ${name} đã có sẵn. Hãy đặt tên khác.`;
+    $('cat-error').hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+    input.focus();
     return;
   }
   // New categories go before "Khác", which stays last.
@@ -716,7 +890,16 @@ document.addEventListener('visibilitychange', () => {
   if (!$('sheet').open && !$('confirm').open) render();
 });
 
+const BIG_TEXT_PX = 20;
+function syncTextSize() {
+  const px = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  document.documentElement.classList.toggle('big-text', px >= BIG_TEXT_PX);
+}
+window.addEventListener('resize', syncTextSize);
+document.addEventListener('visibilitychange', syncTextSize);
+
 /* ---------- Start ---------- */
+syncTextSize();
 render();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator) {

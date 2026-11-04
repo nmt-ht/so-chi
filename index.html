@@ -15,20 +15,26 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="app"></div>
 
-  <button id="fab" class="fab" type="button" data-act="add">
-    <span aria-hidden="true">+</span> Ghi khoản chi
-  </button>
-
-  <nav class="tabs" aria-label="Điều hướng chính">
-    <div class="tabs-inner">
-      <button type="button" data-act="tab" data-view="book">Sổ chi</button>
-      <button type="button" data-act="tab" data-view="stats">Thống kê</button>
-      <button type="button" data-act="tab" data-view="settings">Cài đặt</button>
+  <nav class="dock" aria-label="Điều hướng chính">
+    <div class="dock-inner">
+      <button type="button" class="dock-tab" data-act="tab" data-view="book">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h13v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM4 17a2 2 0 0 1 2-2h13M9 8h6M9 11h6"/></svg>
+        <span>Sổ chi</span>
+      </button>
+      <button type="button" class="dock-add" data-act="add" aria-label="Ghi khoản chi">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Ghi<span class="add-rest"> khoản chi</span></span>
+      </button>
+      <button type="button" class="dock-tab" data-act="tab" data-view="stats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-7M12 20V5M19 20v-10M3 20h18"/></svg>
+        <span>Thống kê</span>
+      </button>
     </div>
   </nav>
 
@@ -44,17 +50,16 @@
 
       <output id="sheet-amount" class="sheet-amount" aria-live="polite">0 đ</output>
 
+      <div id="sheet-quick" class="quick" role="group" aria-label="Khoản hay ghi" hidden></div>
       <div id="sheet-cats" class="cats" role="group" aria-label="Danh mục"></div>
 
-      <div class="sheet-fields">
-        <label class="field">
-          <span>Ngày</span>
-          <input id="sheet-date" type="date">
+      <div class="sheet-meta">
+        <label class="date-pill">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"/></svg>
+          <span id="sheet-date-label">Hôm nay</span>
+          <input id="sheet-date" type="date" aria-label="Ngày chi">
         </label>
-        <label class="field">
-          <span>Ghi chú</span>
-          <input id="sheet-note" type="text" maxlength="120" placeholder="Không bắt buộc" autocomplete="off" enterkeyhint="done">
-        </label>
+        <input id="sheet-note" type="text" maxlength="120" placeholder="Thêm ghi chú" aria-label="Ghi chú" autocomplete="off" enterkeyhint="done">
       </div>
 
       <div id="keypad" class="keypad" role="group" aria-label="Bàn phím số">
@@ -69,10 +74,10 @@
         <button type="button" data-key="9">9</button>
         <button type="button" data-key="000">000</button>
         <button type="button" data-key="0">0</button>
-        <button type="button" data-key="back" aria-label="Xóa một số">&#9003;</button>
+        <button type="button" data-key="back" aria-label="Xóa một số, giữ để xóa hết">&#9003;</button>
       </div>
 
-      <button id="sheet-save" type="button" class="primary" data-act="sheet-save" disabled>Lưu</button>
+      <button id="sheet-save" type="button" class="primary" data-act="sheet-save" disabled>Nhập số tiền</button>
     </form>
   </dialog>
 
